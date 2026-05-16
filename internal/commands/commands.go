@@ -90,8 +90,21 @@ func runStart() {
 
 	// 2. Check Auth
 	if err := exec.Command("gh", "auth", "status").Run(); err != nil {
-		fmt.Println("You are not logged in to GitHub Please run: gh auth login")
-		return
+		fmt.Print("You are not logged in to GitHub Login now? (y/n): ")
+		var login string
+		fmt.Scan(&login)
+		if strings.ToLower(login) == "y" {
+			cmd := exec.Command("gh", "auth", "login")
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				fmt.Printf("Login failed: %v\n", err)
+				return
+			}
+		} else {
+			return
+		}
 	}
 
 	// 3. Ask for repo status
