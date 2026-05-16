@@ -1,20 +1,20 @@
-# 🚀 GoPipe
+# GoPipe
 
-**GoPipe** adalah CLI tool sakti buat generate workflow CI/CD GitHub Actions secara otomatis. Gak perlu pusing lagi mikirin YAML, biar GoPipe yang beresin!
-
----
-
-## ✨ Features
-
-- 🔍 **Auto Project Detection**: Detect Node.js, Next.js, dan Go secara otomatis.
-- 🔌 **Smart Port Discovery**: Nyari port aplikasi lu dari `.env` atau source code.
-- 📂 **GitHub Integration**: Bikin repo baru atau hubungin ke repo yang udah ada.
-- 🔐 **Secret Automation**: Upload SSH secrets ke GitHub secara otomatis pake `gh` CLI.
-- 🚀 **VPS Deployment**: Setup deployment pake SCP/Rsync dan auto-restart service (PM2/Systemd).
+GoPipe is a CLI tool to generate GitHub Actions CI/CD workflows automatically No more YAML headaches, let GoPipe handle it
 
 ---
 
-## 🏗️ Workflow Diagram
+## Features
+
+- Auto Project Detection: Detect Node.js, Next.js, and Go automatically
+- Smart Port Discovery: Find application port from .env or source code
+- GitHub Integration: Create new repository or connect to existing one
+- Secret Automation: Upload SSH secrets to GitHub automatically using gh CLI
+- VPS Deployment: Setup deployment using SCP/Rsync and auto-restart service (PM2/Systemd)
+
+---
+
+## Workflow Diagram
 
 ```mermaid
 graph TD
@@ -26,39 +26,39 @@ graph TD
     E -->|Push to Main| F[GitHub Actions]
     F -->|Build| G[Build Artifacts]
     G -->|Deploy| H[VPS Server]
-    H -->|Restart| I[App Live! 🚀]
+    H -->|Restart| I[App Live]
 ```
 
 ---
 
-## 🛠️ Installation
+## Installation
 
 ```bash
 # Clone repository
-git clone https://github.com/RayhanDitaAdam/test-gopipe.git
+git clone https://github.com/RayhanDitaAdam/GoPipe.git
 
-# Masuk ke folder
-cd test-gopipe
+# Enter folder
+cd GoPipe
 
-# Install (pake script sakti)
+# Install
 bash install.sh
 ```
 
 ---
 
-## 🚀 Usage
+## Usage
 
-Cukup jalankan perintah ini di root project lu:
+Run this command in your project root:
 
 ```bash
 gopipe start
 ```
 
-Ikuti petunjuk di layar, duduk manis, dan boom! CI/CD lu udah siap. 🔥
+Follow the on-screen instructions
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 .
@@ -78,10 +78,17 @@ Ikuti petunjuk di layar, duduk manis, dan boom! CI/CD lu udah siap. 🔥
 
 ---
 
-## 📖 Documentation
+## Documentation
 
-- [PRD.md](./docs/PRD.md) - Visi dan fitur produk.
-- [FUNDAMENTAL.md](./docs/FUNDAMENTAL.md) - Cara kerja dan arsitektur teknis.
+- [PRD.md](./docs/PRD.md) - Product vision and features
+- [FUNDAMENTAL.md](./docs/FUNDAMENTAL.md) - Technical architecture and logic
 
 ---
 
+## Contributing
+
+Want to add features or fix bugs? Feel free to open a Pull Request
+
+---
+
+Made by [RayhanDitaAdam](https://github.com/RayhanDitaAdam)

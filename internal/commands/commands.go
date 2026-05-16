@@ -13,6 +13,15 @@ import (
 	"gopipe/internal/workflow"
 )
 
+const banner = `
+  ____        ____  _             
+ / ___| ___  |  _ \(_)_ __   ___ 
+| |  _ / _ \ | |_) | | '_ \ / _ \
+| |_| | (_) ||  __/| | |_) |  __/
+ \____|\___/ |_|   |_| .__/ \___|
+                     |_|         
+`
+
 func Execute() {
 	if len(os.Args) < 2 {
 		showHelp()
@@ -23,78 +32,79 @@ func Execute() {
 
 	switch command {
 	case "start":
+		fmt.Println(banner)
 		runStart()
 	case "help", "-h", "--help":
 		showHelp()
 	default:
-		fmt.Printf("❌ Command tidak dikenal: %s\n", command)
+		fmt.Printf("Unknown command: %s\n", command)
 		showHelp()
 		os.Exit(1)
 	}
 }
 
 func showHelp() {
-	fmt.Println("🚀 GoPipe - Auto CI/CD Generator")
-	fmt.Println("Gue bakal bantu lu nge-generate workflow GitHub Actions secara otomatis.")
+	fmt.Println("GoPipe - Auto CI/CD Generator")
+	fmt.Println("I will help you generate GitHub Actions workflow automatically")
 	fmt.Println("\nUsage:")
-	fmt.Println("  gopipe start    Analisa project dan generate deploy.yml")
-	fmt.Println("  gopipe help     Tampilkan bantuan ini")
+	fmt.Println("  gopipe start    Analyze project and generate deploy.yml")
+	fmt.Println("  gopipe help     Show this help")
 }
 
 func runStart() {
 	dir, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Gagal baca direktori: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to read directory: %v\n", err)
 		os.Exit(1)
 	}
 
 	proj := detector.DetectProject(dir)
 	if proj.Language == "" {
-		fmt.Println("❌ Tidak terdeteksi project yang dikenal (Node/Next/Go).")
+		fmt.Println("No supported project detected (Node/Next/Go)")
 		os.Exit(0)
 	}
 
-	fmt.Printf("🚀 Project terdeteksi: %s\n", proj.Language)
-	fmt.Printf("🔌 Port: %s\n", proj.Port)
+	fmt.Printf("Project detected: %s\n", proj.Language)
+	fmt.Printf("Port: %s\n", proj.Port)
 
 	if err := workflow.GenerateGithubActions(proj); err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Gagal generate CI/CD: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to generate CI/CD: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("✅ CI/CD workflow berhasil digenerate di .github/workflows/deploy.yml")
+	fmt.Println("CI/CD workflow generated at .github/workflows/deploy.yml")
 
 	// --- GitHub Integration ---
-	fmt.Print("\n🌐 Hubungkan project ini ke GitHub? (y/n): ")
+	fmt.Print("\nConnect this project to GitHub? (y/n): ")
 	var connect string
 	fmt.Scan(&connect)
 	if strings.ToLower(connect) != "y" {
-		fmt.Println("Siaap, CI/CD udah siap lokal aja. Mantap, bre! 🔥")
+		fmt.Println("CI/CD setup complete locally")
 		return
 	}
 
 	// 1. Check GH CLI
 	if err := exec.Command("gh", "--version").Run(); err != nil {
-		fmt.Println("❌ GitHub CLI (gh) tidak ditemukan. Install dulu ya biar makin sakti!")
+		fmt.Println("GitHub CLI (gh) not found Please install it first")
 		return
 	}
 
 	// 2. Check Auth
 	if err := exec.Command("gh", "auth", "status").Run(); err != nil {
-		fmt.Println("🔑 Kamu belum login ke GitHub. Silakan jalankan: gh auth login")
+		fmt.Println("You are not logged in to GitHub Please run: gh auth login")
 		return
 	}
 
 	// 3. Ask for repo status
-	fmt.Print("📂 Udah punya repo di GitHub buat project ini? (y/n): ")
+	fmt.Print("Do you already have a repository on GitHub for this project? (y/n): ")
 	var hasRepo string
 	fmt.Scan(&hasRepo)
 
 	var repoName string
 	if strings.ToLower(hasRepo) == "y" {
-		fmt.Print("🔗 Masukkan nama repo (misal: username/repo-name): ")
+		fmt.Print("Enter repository name (e.g. username/repo-name): ")
 		fmt.Scan(&repoName)
 
-		fmt.Println("🔗 Menghubungkan ke remote origin...")
+		fmt.Println("Connecting to remote origin")
 		exec.Command("git", "init").Run()
 		exec.Command("git", "remote", "add", "origin", "https://github.com/"+repoName+".git").Run()
 		exec.Command("git", "add", ".").Run()
@@ -108,39 +118,38 @@ func runStart() {
 			currentBranch = "main" // Fallback
 		}
 
-		fmt.Printf("🚀 Pushing branch '%s' to GitHub...\n", currentBranch)
+		fmt.Printf("Pushing branch '%s' to GitHub\n", currentBranch)
 		cmd := exec.Command("git", "push", "-u", "origin", currentBranch)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			fmt.Printf("❌ Gagal push ke GitHub: %v\n", err)
+			fmt.Printf("Failed to push to GitHub: %v\n", err)
 			return
 		}
 	} else {
-		fmt.Print("🆕 Masukkan nama repo baru yang mau dibuat: ")
+		fmt.Print("Enter new repository name: ")
 		fmt.Scan(&repoName)
 
-		fmt.Println("🔨 Menyiapkan git lokal...")
+		fmt.Println("Setting up local git")
 		exec.Command("git", "init").Run()
 		exec.Command("git", "add", ".").Run()
 		exec.Command("git", "commit", "-m", "chore: setup gopipe ci/cd").Run()
 
-		fmt.Println("🔨 Membuat repository baru di GitHub dan pushing...")
-		// Use gh repo create with source and push
+		fmt.Println("Creating new repository on GitHub and pushing")
 		cmd := exec.Command("gh", "repo", "create", repoName, "--public", "--source=.", "--push")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			fmt.Printf("❌ Gagal membuat repo: %v\n", err)
+			fmt.Printf("Failed to create repository: %v\n", err)
 			return
 		}
 	}
 
-	fmt.Print("\n🖥️  Setup CI/CD ke VPS sekarang? (y/n): ")
+	fmt.Print("\nSetup CI/CD to VPS now? (y/n): ")
 	var setupVPS string
 	fmt.Scan(&setupVPS)
 	if strings.ToLower(setupVPS) != "y" {
-		fmt.Println("\n✨ Mantap, bre! Project lu udah aman di GitHub dengan CI/CD yang nyala! 🔥")
+		fmt.Println("\nProject is now on GitHub with CI/CD enabled")
 		return
 	}
 
@@ -149,8 +158,8 @@ func runStart() {
 	useSaved := "n"
 
 	if err == nil {
-		fmt.Printf("📦 Nemu config VPS tersimpan: %s@%s\n", appConfig.VpsUser, appConfig.VpsIP)
-		fmt.Print("🖥️  Gunakan config ini, bre? (y/n): ")
+		fmt.Printf("Found saved VPS config: %s@%s\n", appConfig.VpsUser, appConfig.VpsIP)
+		fmt.Print("Use this config? (y/n): ")
 		fmt.Scan(&useSaved)
 	}
 
@@ -159,13 +168,13 @@ func runStart() {
 		vpsUser = appConfig.VpsUser
 		keyPath = appConfig.VpsKeyPath
 	} else {
-		fmt.Print("🌐 Masukkan IP VPS: ")
+		fmt.Print("Enter VPS IP: ")
 		fmt.Scan(&vpsIP)
 
-		fmt.Print("👤 Masukkan Username VPS: ")
+		fmt.Print("Enter VPS Username: ")
 		fmt.Scan(&vpsUser)
 
-		fmt.Print("🔑 Masukkan path ke SSH Private Key (misal: /home/user/.ssh/id_rsa): ")
+		fmt.Print("Enter path to SSH Private Key (e.g. /home/user/.ssh/id_rsa): ")
 		fmt.Scan(&keyPath)
 
 		// Save new config
@@ -180,14 +189,14 @@ func runStart() {
 
 	keyContent, err := os.ReadFile(resolvedPath)
 	if err != nil {
-		fmt.Printf("❌ Gagal baca SSH Key di %s: %v\n", resolvedPath, err)
+		fmt.Printf("Failed to read SSH Key at %s: %v\n", resolvedPath, err)
 		return
 	}
 
-	fmt.Println("🔐 Mengupload secrets ke GitHub...")
+	fmt.Println("Uploading secrets to GitHub")
 	github.SetSecret("SSH_HOST", vpsIP)
 	github.SetSecret("SSH_USER", vpsUser)
 	github.SetSecret("SSH_KEY", string(keyContent))
 
-	fmt.Println("\n✨ SEMUA SET! Sekarang tiap lu push, project lu bakal otomatis deploy ke VPS! Mantap, bre! 🔥🚀")
+	fmt.Println("\nSetup complete Every time you push, your project will be automatically deployed to VPS")
 }
