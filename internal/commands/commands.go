@@ -139,6 +139,7 @@ func runStart() {
 
 		fmt.Println("Connecting to remote origin")
 		exec.Command("git", "init").Run()
+		exec.Command("git", "remote", "remove", "origin").Run()
 		exec.Command("git", "remote", "add", "origin", "https://github.com/"+repoName+".git").Run()
 		exec.Command("git", "add", ".").Run()
 		exec.Command("git", "commit", "-m", "chore: setup gopipe ci/cd").Run()
@@ -172,6 +173,8 @@ func runStart() {
 
 		fmt.Println("Setting up local git")
 		exec.Command("git", "init").Run()
+		// Remove existing origin if any to avoid gh repo create conflict
+		exec.Command("git", "remote", "remove", "origin").Run()
 		exec.Command("git", "add", ".").Run()
 		exec.Command("git", "commit", "-m", "chore: setup gopipe ci/cd").Run()
 
