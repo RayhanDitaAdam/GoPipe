@@ -32,7 +32,7 @@ func Execute() {
 
 	switch command {
 	case "start":
-		fmt.Println(banner)
+		fmt.Print(banner)
 		runStart()
 	case "help", "-h", "--help":
 		showHelp()

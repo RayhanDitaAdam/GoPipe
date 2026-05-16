@@ -12,7 +12,7 @@ import (
 func GenerateGithubActions(proj detector.Project) error {
 	workDir := filepath.Join(proj.RootDir, ".github", "workflows")
 	if err := os.MkdirAll(workDir, 0755); err != nil {
-		return fmt.Errorf("gagal buat direktori: %w", err)
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	action := buildWorkflow(proj)
@@ -62,7 +62,8 @@ func buildWorkflow(proj detector.Project) string {
 			installCmd := "npm ci"
 			buildCmd := "npm run build"
 			pnpmStep := ""
-			if proj.PackageManager == "pnpm" {
+			switch proj.PackageManager {
+			case "pnpm":
 				installCmd = "pnpm install"
 				buildCmd = "pnpm run build"
 				pnpmStep = `      - name: Install pnpm
@@ -70,7 +71,7 @@ func buildWorkflow(proj detector.Project) string {
         with:
           version: 9
 `
-			} else if proj.PackageManager == "yarn" {
+			case "yarn":
 				installCmd = "yarn install"
 				buildCmd = "yarn run build"
 			}
@@ -131,7 +132,8 @@ func buildWorkflow(proj detector.Project) string {
 			installCmd := "npm ci"
 			buildCmd := "npm run build"
 			pnpmStep := ""
-			if proj.PackageManager == "pnpm" {
+			switch proj.PackageManager {
+			case "pnpm":
 				installCmd = "pnpm install"
 				buildCmd = "pnpm run build"
 				pnpmStep = `      - name: Install pnpm
@@ -139,7 +141,7 @@ func buildWorkflow(proj detector.Project) string {
         with:
           version: 9
 `
-			} else if proj.PackageManager == "yarn" {
+			case "yarn":
 				installCmd = "yarn install"
 				buildCmd = "yarn run build"
 			}
@@ -211,4 +213,3 @@ jobs:
 %s
 `, proj.Port, buildSteps, deploySteps)
 }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
