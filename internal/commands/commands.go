@@ -11,6 +11,8 @@ import (
 	"gopipe/internal/detector"
 	"gopipe/internal/github"
 	"gopipe/internal/workflow"
+
+	"github.com/AlecAivazis/survey/v2"
 )
 
 const banner = `
@@ -74,10 +76,14 @@ func runStart() {
 	fmt.Println("CI/CD workflow generated at .github/workflows/deploy.yml")
 
 	// --- GitHub Integration ---
-	fmt.Print("\nConnect this project to GitHub? (y/n): ")
-	var connect string
-	fmt.Scan(&connect)
-	if strings.ToLower(connect) != "y" {
+	var connect bool
+	promptConnect := &survey.Confirm{
+		Message: "Connect this project to GitHub?",
+		Default: true,
+	}
+	survey.AskOne(promptConnect, &connect)
+
+	if !connect {
 		fmt.Println("CI/CD setup complete locally")
 		return
 	}
@@ -90,10 +96,14 @@ func runStart() {
 
 	// 2. Check Auth
 	if err := exec.Command("gh", "auth", "status").Run(); err != nil {
-		fmt.Print("You are not logged in to GitHub Login now? (y/n): ")
-		var login string
-		fmt.Scan(&login)
-		if strings.ToLower(login) == "y" {
+		var login bool
+		promptLogin := &survey.Confirm{
+			Message: "You are not logged in to GitHub Login now?",
+			Default: true,
+		}
+		survey.AskOne(promptLogin, &login)
+
+		if login {
 			cmd := exec.Command("gh", "auth", "login")
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout
@@ -108,14 +118,24 @@ func runStart() {
 	}
 
 	// 3. Ask for repo status
-	fmt.Print("Do you already have a repository on GitHub for this project? (y/n): ")
-	var hasRepo string
-	fmt.Scan(&hasRepo)
+	var hasRepo bool
+	promptHasRepo := &survey.Confirm{
+		Message: "Do you already have a repository on GitHub for this project?",
+		Default: false,
+	}
+	survey.AskOne(promptHasRepo, &hasRepo)
 
 	var repoName string
-	if strings.ToLower(hasRepo) == "y" {
-		fmt.Print("Enter repository name (e.g. username/repo-name): ")
-		fmt.Scan(&repoName)
+	if hasRepo {
+		promptRepoName := &survey.Input{
+			Message: "Enter repository name (e.g. username/repo-name):",
+		}
+		survey.AskOne(promptRepoName, &repoName)
+
+		if repoName == "" {
+			fmt.Println("Repository name cannot be empty")
+			return
+		}
 
 		fmt.Println("Connecting to remote origin")
 		exec.Command("git", "init").Run()
@@ -140,8 +160,15 @@ func runStart() {
 			return
 		}
 	} else {
-		fmt.Print("Enter new repository name: ")
-		fmt.Scan(&repoName)
+		promptNewRepo := &survey.Input{
+			Message: "Enter new repository name:",
+		}
+		survey.AskOne(promptNewRepo, &repoName)
+
+		if repoName == "" {
+			fmt.Println("Repository name cannot be empty")
+			return
+		}
 
 		fmt.Println("Setting up local git")
 		exec.Command("git", "init").Run()
@@ -158,37 +185,55 @@ func runStart() {
 		}
 	}
 
-	fmt.Print("\nSetup CI/CD to VPS now? (y/n): ")
-	var setupVPS string
-	fmt.Scan(&setupVPS)
-	if strings.ToLower(setupVPS) != "y" {
+	var setupVPS bool
+	promptSetupVPS := &survey.Confirm{
+		Message: "Setup CI/CD to VPS now?",
+		Default: true,
+	}
+	survey.AskOne(promptSetupVPS, &setupVPS)
+
+	if !setupVPS {
 		fmt.Println("\nProject is now on GitHub with CI/CD enabled")
 		return
 	}
 
 	var vpsIP, vpsUser, keyPath string
 	appConfig, err := config.LoadConfig()
-	useSaved := "n"
+	useSaved := false
 
 	if err == nil {
 		fmt.Printf("Found saved VPS config: %s@%s\n", appConfig.VpsUser, appConfig.VpsIP)
-		fmt.Print("Use this config? (y/n): ")
-		fmt.Scan(&useSaved)
+		promptUseSaved := &survey.Confirm{
+			Message: "Use this config?",
+			Default: true,
+		}
+		survey.AskOne(promptUseSaved, &useSaved)
 	}
 
-	if strings.ToLower(useSaved) == "y" {
+	if useSaved {
 		vpsIP = appConfig.VpsIP
 		vpsUser = appConfig.VpsUser
 		keyPath = appConfig.VpsKeyPath
 	} else {
-		fmt.Print("Enter VPS IP: ")
-		fmt.Scan(&vpsIP)
+		promptVpsIP := &survey.Input{
+			Message: "Enter VPS IP:",
+		}
+		survey.AskOne(promptVpsIP, &vpsIP)
 
-		fmt.Print("Enter VPS Username: ")
-		fmt.Scan(&vpsUser)
+		promptVpsUser := &survey.Input{
+			Message: "Enter VPS Username:",
+		}
+		survey.AskOne(promptVpsUser, &vpsUser)
 
-		fmt.Print("Enter path to SSH Private Key (e.g. /home/user/.ssh/id_rsa): ")
-		fmt.Scan(&keyPath)
+		promptKeyPath := &survey.Input{
+			Message: "Enter path to SSH Private Key (e.g. /home/user/.ssh/id_rsa):",
+		}
+		survey.AskOne(promptKeyPath, &keyPath)
+
+		if vpsIP == "" || vpsUser == "" || keyPath == "" {
+			fmt.Println("VPS details cannot be empty")
+			return
+		}
 
 		// Save new config
 		config.SaveConfig(config.AppConfig{VpsIP: vpsIP, VpsUser: vpsUser, VpsKeyPath: keyPath})
