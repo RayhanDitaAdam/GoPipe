@@ -198,5 +198,5 @@ func runStart() {
 	github.SetSecret("SSH_USER", vpsUser)
 	github.SetSecret("SSH_KEY", string(keyContent))
 
-	fmt.Println("\nSetup complete Every time you push, your project will be automatically deployed to VPS")
+	fmt.Println("\nSetup complete Every time you push, your project will be automatically deployed to ~/apps/gopipe on your VPS")
 }
