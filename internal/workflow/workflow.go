@@ -35,14 +35,14 @@ func buildWorkflow(proj detector.Project) string {
       - name: Build
         run: go build -o app main.go`
 
-			deploySteps = `      - name: Deploy to Server
+			deploySteps = fmt.Sprintf(`      - name: Deploy to Server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           source: "app"
-          target: "~/apps/gopipe"
+          target: "~/apps/%[1]s"
 
       - name: Restart Service
         uses: appleboy/ssh-action@v1.0.3
@@ -51,10 +51,10 @@ func buildWorkflow(proj detector.Project) string {
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd ~/apps/gopipe
+            cd ~/apps/%[1]s
             chmod +x app
-            sudo systemctl restart gopipe || true
-            nohup ./app > app.log 2>&1 &`
+            sudo systemctl restart %[1]s || true
+            nohup ./app > app.log 2>&1 &`, proj.AppName())
 		}
 
 	case "Next.js":
@@ -94,20 +94,20 @@ func buildWorkflow(proj detector.Project) string {
 
 			buildSteps = strings.ReplaceAll(buildSteps, "PM_REPLACE", proj.PackageManager)
 
-			deploySteps = `      - name: Create Target Directory
+			deploySteps = fmt.Sprintf(`      - name: Create Target Directory
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          script: mkdir -p ~/apps/gopipe
+          script: mkdir -p ~/apps/%[1]s
 
       - name: Deploy via Rsync
         uses: burnett01/rsync-deployments@v8
         with:
           switches: -avzr --delete
           path: .next/
-          remote_path: ~/apps/gopipe
+          remote_path: ~/apps/%[1]s
           remote_host: ${{ secrets.SSH_HOST }}
           remote_user: ${{ secrets.SSH_USER }}
           remote_key: ${{ secrets.SSH_KEY }}
@@ -120,9 +120,9 @@ func buildWorkflow(proj detector.Project) string {
           key: ${{ secrets.SSH_KEY }}
           script: |
             export PATH=$PATH:/usr/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.npm-global/bin
-            cd ~/apps/gopipe
+            cd ~/apps/%[1]s
             npm install
-            pm2 restart gopipe || pm2 start "npm run start -- --port $PORT" --name gopipe || pm2 start "npm run preview -- --port $PORT" --name gopipe`
+            pm2 restart %[1]s || pm2 start "npm run start -- --port $PORT" --name %[1]s || pm2 start "npm run preview -- --port $PORT" --name %[1]s`, proj.AppName())
 
 			deploySteps = strings.ReplaceAll(deploySteps, "PM_REPLACE", proj.PackageManager)
 		}
@@ -158,20 +158,20 @@ func buildWorkflow(proj detector.Project) string {
       - name: Build
         run: %s`, pnpmStep, installCmd, buildCmd)
 
-			deploySteps = `      - name: Create Target Directory
+			deploySteps = fmt.Sprintf(`      - name: Create Target Directory
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          script: mkdir -p ~/apps/gopipe
+          script: mkdir -p ~/apps/%[1]s
 
       - name: Deploy via Rsync
         uses: burnett01/rsync-deployments@v8
         with:
           switches: -avzr --delete
           path: ./ --exclude node_modules --exclude .git
-          remote_path: ~/apps/gopipe
+          remote_path: ~/apps/%[1]s
           remote_host: ${{ secrets.SSH_HOST }}
           remote_user: ${{ secrets.SSH_USER }}
           remote_key: ${{ secrets.SSH_KEY }}
@@ -184,9 +184,9 @@ func buildWorkflow(proj detector.Project) string {
           key: ${{ secrets.SSH_KEY }}
           script: |
             export PATH=$PATH:/usr/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.npm-global/bin
-            cd ~/apps/gopipe
+            cd ~/apps/%[1]s
             npm install
-            pm2 restart gopipe || pm2 start "npm run start -- --port $PORT" --name gopipe || pm2 start "npm run preview -- --port $PORT" --name gopipe`
+            pm2 restart %[1]s || pm2 start "npm run start -- --port $PORT" --name %[1]s || pm2 start "npm run preview -- --port $PORT" --name %[1]s`, proj.AppName())
 
 			deploySteps = strings.ReplaceAll(deploySteps, "PM_REPLACE", proj.PackageManager)
 		}

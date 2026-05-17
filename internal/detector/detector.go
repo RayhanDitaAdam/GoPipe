@@ -123,3 +123,21 @@ func hasDir(dir, name string) bool {
 	info, err := os.Stat(filepath.Join(dir, name))
 	return err == nil && info.IsDir()
 }
+
+func (p Project) AppName() string {
+	appName := filepath.Base(p.RootDir)
+	appName = strings.ToLower(appName)
+	var sb strings.Builder
+	for _, r := range appName {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			sb.WriteRune(r)
+		} else if r == ' ' {
+			sb.WriteRune('-')
+		}
+	}
+	res := sb.String()
+	if res == "" {
+		return "gopipe-app"
+	}
+	return res
+}
