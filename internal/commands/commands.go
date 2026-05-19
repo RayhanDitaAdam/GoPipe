@@ -143,23 +143,6 @@ func runStart() {
 		exec.Command("git", "remote", "add", "origin", "https://github.com/"+repoName+".git").Run()
 		exec.Command("git", "add", ".").Run()
 		exec.Command("git", "commit", "-m", "chore: setup gopipe ci/cd").Run()
-
-		// Detect current branch
-		branchCmd := exec.Command("git", "branch", "--show-current")
-		branchOut, _ := branchCmd.Output()
-		currentBranch := strings.TrimSpace(string(branchOut))
-		if currentBranch == "" {
-			currentBranch = "main" // Fallback
-		}
-
-		fmt.Printf("Pushing branch '%s' to GitHub\n", currentBranch)
-		cmd := exec.Command("git", "push", "-u", "origin", currentBranch)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			fmt.Printf("Failed to push to GitHub: %v\n", err)
-			return
-		}
 	} else {
 		promptNewRepo := &survey.Input{
 			Message: "Enter new repository name:",
@@ -171,6 +154,14 @@ func runStart() {
 			return
 		}
 
+		var visibility string
+		promptVisibility := &survey.Select{
+			Message: "Choose repository visibility:",
+			Options: []string{"public", "private"},
+			Default: "private",
+		}
+		survey.AskOne(promptVisibility, &visibility)
+
 		fmt.Println("Setting up local git")
 		exec.Command("git", "init").Run()
 		// Remove existing origin if any to avoid gh repo create conflict
@@ -178,8 +169,13 @@ func runStart() {
 		exec.Command("git", "add", ".").Run()
 		exec.Command("git", "commit", "-m", "chore: setup gopipe ci/cd").Run()
 
-		fmt.Println("Creating new repository on GitHub and pushing")
-		cmd := exec.Command("gh", "repo", "create", repoName, "--public", "--source=.", "--push")
+		visibilityFlag := "--public"
+		if visibility == "private" {
+			visibilityFlag = "--private"
+		}
+
+		fmt.Println("Creating new repository on GitHub")
+		cmd := exec.Command("gh", "repo", "create", repoName, visibilityFlag, "--source=.")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -195,69 +191,88 @@ func runStart() {
 	}
 	survey.AskOne(promptSetupVPS, &setupVPS)
 
-	if !setupVPS {
-		fmt.Println("\nProject is now on GitHub with CI/CD enabled")
-		return
-	}
+	if setupVPS {
+		var vpsIP, vpsUser, keyPath string
+		appConfig, err := config.LoadConfig()
+		useSaved := false
 
-	var vpsIP, vpsUser, keyPath string
-	appConfig, err := config.LoadConfig()
-	useSaved := false
-
-	if err == nil {
-		fmt.Printf("Found saved VPS config: %s@%s\n", appConfig.VpsUser, appConfig.VpsIP)
-		promptUseSaved := &survey.Confirm{
-			Message: "Use this config?",
-			Default: true,
+		if err == nil {
+			fmt.Printf("Found saved VPS config: %s@%s\n", appConfig.VpsUser, appConfig.VpsIP)
+			promptUseSaved := &survey.Confirm{
+				Message: "Use this config?",
+				Default: true,
+			}
+			survey.AskOne(promptUseSaved, &useSaved)
 		}
-		survey.AskOne(promptUseSaved, &useSaved)
-	}
 
-	if useSaved {
-		vpsIP = appConfig.VpsIP
-		vpsUser = appConfig.VpsUser
-		keyPath = appConfig.VpsKeyPath
-	} else {
-		promptVpsIP := &survey.Input{
-			Message: "Enter VPS IP:",
+		if useSaved {
+			vpsIP = appConfig.VpsIP
+			vpsUser = appConfig.VpsUser
+			keyPath = appConfig.VpsKeyPath
+		} else {
+			promptVpsIP := &survey.Input{
+				Message: "Enter VPS IP:",
+			}
+			survey.AskOne(promptVpsIP, &vpsIP)
+
+			promptVpsUser := &survey.Input{
+				Message: "Enter VPS Username:",
+			}
+			survey.AskOne(promptVpsUser, &vpsUser)
+
+			promptKeyPath := &survey.Input{
+				Message: "Enter path to SSH Private Key (e.g. /home/user/.ssh/id_rsa):",
+			}
+			survey.AskOne(promptKeyPath, &keyPath)
+
+			if vpsIP == "" || vpsUser == "" || keyPath == "" {
+				fmt.Println("VPS details cannot be empty")
+				return
+			}
+
+			// Save new config
+			config.SaveConfig(config.AppConfig{VpsIP: vpsIP, VpsUser: vpsUser, VpsKeyPath: keyPath})
 		}
-		survey.AskOne(promptVpsIP, &vpsIP)
 
-		promptVpsUser := &survey.Input{
-			Message: "Enter VPS Username:",
+		// Resolve path (handle ~ if any)
+		resolvedPath := keyPath
+		if strings.HasPrefix(resolvedPath, "~") {
+			resolvedPath = filepath.Join(os.Getenv("HOME"), resolvedPath[1:])
 		}
-		survey.AskOne(promptVpsUser, &vpsUser)
 
-		promptKeyPath := &survey.Input{
-			Message: "Enter path to SSH Private Key (e.g. /home/user/.ssh/id_rsa):",
-		}
-		survey.AskOne(promptKeyPath, &keyPath)
-
-		if vpsIP == "" || vpsUser == "" || keyPath == "" {
-			fmt.Println("VPS details cannot be empty")
+		keyContent, err := os.ReadFile(resolvedPath)
+		if err != nil {
+			fmt.Printf("Failed to read SSH Key at %s: %v\n", resolvedPath, err)
 			return
 		}
 
-		// Save new config
-		config.SaveConfig(config.AppConfig{VpsIP: vpsIP, VpsUser: vpsUser, VpsKeyPath: keyPath})
+		fmt.Println("Uploading secrets to GitHub")
+		github.SetSecret("SSH_HOST", vpsIP)
+		github.SetSecret("SSH_USER", vpsUser)
+		github.SetSecret("SSH_KEY", string(keyContent))
 	}
 
-	// Resolve path (handle ~ if any)
-	resolvedPath := keyPath
-	if strings.HasPrefix(resolvedPath, "~") {
-		resolvedPath = filepath.Join(os.Getenv("HOME"), resolvedPath[1:])
+	// Final Push to GitHub
+	// Detect current branch
+	branchCmd := exec.Command("git", "branch", "--show-current")
+	branchOut, _ := branchCmd.Output()
+	currentBranch := strings.TrimSpace(string(branchOut))
+	if currentBranch == "" {
+		currentBranch = "main" // Fallback
 	}
 
-	keyContent, err := os.ReadFile(resolvedPath)
-	if err != nil {
-		fmt.Printf("Failed to read SSH Key at %s: %v\n", resolvedPath, err)
+	fmt.Printf("Pushing branch '%s' to GitHub and triggering CI/CD\n", currentBranch)
+	pushCmd := exec.Command("git", "push", "-u", "origin", currentBranch)
+	pushCmd.Stdout = os.Stdout
+	pushCmd.Stderr = os.Stderr
+	if err := pushCmd.Run(); err != nil {
+		fmt.Printf("Failed to push to GitHub: %v\n", err)
 		return
 	}
 
-	fmt.Println("Uploading secrets to GitHub")
-	github.SetSecret("SSH_HOST", vpsIP)
-	github.SetSecret("SSH_USER", vpsUser)
-	github.SetSecret("SSH_KEY", string(keyContent))
-
-	fmt.Printf("\nSetup complete Every time you push, your project will be automatically deployed to ~/apps/%s on your VPS\n", proj.AppName())
+	if setupVPS {
+		fmt.Printf("\nSetup complete! Every time you push, your project will be automatically deployed to ~/apps/%s on your VPS\n", proj.AppName())
+	} else {
+		fmt.Println("\nProject is now on GitHub with CI/CD enabled (VPS secrets not configured)")
+	}
 }

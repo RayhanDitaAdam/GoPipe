@@ -59,13 +59,16 @@ func buildWorkflow(proj detector.Project) string {
 
 	case "Next.js":
 		{
-			installCmd := "npm ci"
+			installCmd := "npm install"
 			buildCmd := "npm run build"
 			pnpmStep := ""
+			pmName := "npm"
+
 			switch proj.PackageManager {
 			case "pnpm":
 				installCmd = "pnpm install"
 				buildCmd = "pnpm run build"
+				pmName = "pnpm"
 				pnpmStep = `      - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -74,6 +77,15 @@ func buildWorkflow(proj detector.Project) string {
 			case "yarn":
 				installCmd = "yarn install"
 				buildCmd = "yarn run build"
+				pmName = "yarn"
+			case "npm-ci":
+				installCmd = "npm ci"
+				buildCmd = "npm run build"
+				pmName = "npm"
+			case "npm":
+				installCmd = "npm install"
+				buildCmd = "npm run build"
+				pmName = "npm"
 			}
 
 			buildSteps = fmt.Sprintf(`      - name: Setup Node.js
@@ -83,16 +95,22 @@ func buildWorkflow(proj detector.Project) string {
 
 %s
       - name: Install dependencies
-        run: %s
+        run: %s`, pnpmStep, installCmd)
+
+			if proj.HasBuildScript {
+				buildSteps += fmt.Sprintf(`
 
       - name: Build
-        run: %s
+        run: %s`, buildCmd)
+			}
+
+			buildSteps += `
 
       - name: Export static
         if: hashFiles('next.config.js') != ''
-        run: PM_REPLACE run export || true`, pnpmStep, installCmd, buildCmd)
+        run: PM_REPLACE run export || true`
 
-			buildSteps = strings.ReplaceAll(buildSteps, "PM_REPLACE", proj.PackageManager)
+			buildSteps = strings.ReplaceAll(buildSteps, "PM_REPLACE", pmName)
 
 			deploySteps = fmt.Sprintf(`      - name: Create Target Directory
         uses: appleboy/ssh-action@v1.0.3
@@ -119,23 +137,28 @@ func buildWorkflow(proj detector.Project) string {
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             export PATH=$PATH:/usr/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.npm-global/bin
             cd ~/apps/%[1]s
-            npm install
-            pm2 restart %[1]s || pm2 start "npm run start -- --port $PORT" --name %[1]s || pm2 start "npm run preview -- --port $PORT" --name %[1]s`, proj.AppName())
+            PM_REPLACE install
+            pm2 restart %[1]s || pm2 start "PM_REPLACE run start -- --port $PORT" --name %[1]s || pm2 start "PM_REPLACE run preview -- --port $PORT" --name %[1]s`, proj.AppName())
 
-			deploySteps = strings.ReplaceAll(deploySteps, "PM_REPLACE", proj.PackageManager)
+			deploySteps = strings.ReplaceAll(deploySteps, "PM_REPLACE", pmName)
 		}
 
 	case "Node.js":
 		{
-			installCmd := "npm ci"
+			installCmd := "npm install"
 			buildCmd := "npm run build"
 			pnpmStep := ""
+			pmName := "npm"
+
 			switch proj.PackageManager {
 			case "pnpm":
 				installCmd = "pnpm install"
 				buildCmd = "pnpm run build"
+				pmName = "pnpm"
 				pnpmStep = `      - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -144,6 +167,15 @@ func buildWorkflow(proj detector.Project) string {
 			case "yarn":
 				installCmd = "yarn install"
 				buildCmd = "yarn run build"
+				pmName = "yarn"
+			case "npm-ci":
+				installCmd = "npm ci"
+				buildCmd = "npm run build"
+				pmName = "npm"
+			case "npm":
+				installCmd = "npm install"
+				buildCmd = "npm run build"
+				pmName = "npm"
 			}
 
 			buildSteps = fmt.Sprintf(`      - name: Setup Node.js
@@ -153,10 +185,14 @@ func buildWorkflow(proj detector.Project) string {
 
 %s
       - name: Install dependencies
-        run: %s
+        run: %s`, pnpmStep, installCmd)
+
+			if proj.HasBuildScript {
+				buildSteps += fmt.Sprintf(`
 
       - name: Build
-        run: %s`, pnpmStep, installCmd, buildCmd)
+        run: %s`, buildCmd)
+			}
 
 			deploySteps = fmt.Sprintf(`      - name: Create Target Directory
         uses: appleboy/ssh-action@v1.0.3
@@ -183,12 +219,14 @@ func buildWorkflow(proj detector.Project) string {
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             export PATH=$PATH:/usr/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.npm-global/bin
             cd ~/apps/%[1]s
-            npm install
-            pm2 restart %[1]s || pm2 start "npm run start -- --port $PORT" --name %[1]s || pm2 start "npm run preview -- --port $PORT" --name %[1]s`, proj.AppName())
+            PM_REPLACE install
+            pm2 restart %[1]s || pm2 start "PM_REPLACE run start -- --port $PORT" --name %[1]s || pm2 start "PM_REPLACE run preview -- --port $PORT" --name %[1]s`, proj.AppName())
 
-			deploySteps = strings.ReplaceAll(deploySteps, "PM_REPLACE", proj.PackageManager)
+			deploySteps = strings.ReplaceAll(deploySteps, "PM_REPLACE", pmName)
 		}
 	}
 

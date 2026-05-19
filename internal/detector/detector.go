@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -14,6 +15,7 @@ type Project struct {
 	Port           string
 	RootDir        string
 	PackageManager string
+	HasBuildScript bool
 }
 
 func DetectProject(dir string) Project {
@@ -26,12 +28,24 @@ func DetectProject(dir string) Project {
 		}
 
 		// Detect Package Manager
-		if hasFile(dir, "pnpm-lock.yaml") {
+		if hasTrackedFile(dir, "pnpm-lock.yaml") {
 			p.PackageManager = "pnpm"
-		} else if hasFile(dir, "yarn.lock") {
+		} else if hasTrackedFile(dir, "yarn.lock") {
 			p.PackageManager = "yarn"
+		} else if hasTrackedFile(dir, "package-lock.json") {
+			p.PackageManager = "npm-ci"
 		} else {
 			p.PackageManager = "npm"
+		}
+
+		// Check build script in package.json
+		if content, err := os.ReadFile(filepath.Join(dir, "package.json")); err == nil {
+			var pkg map[string]interface{}
+			if err := json.Unmarshal(content, &pkg); err == nil {
+				if scripts, ok := pkg["scripts"].(map[string]interface{}); ok {
+					_, p.HasBuildScript = scripts["build"]
+				}
+			}
 		}
 	} else if hasFile(dir, "go.mod") {
 		p.Language = "Go"
@@ -117,6 +131,22 @@ func extractPort(dir, lang string) string {
 func hasFile(dir, name string) bool {
 	info, err := os.Stat(filepath.Join(dir, name))
 	return err == nil && !info.IsDir()
+}
+
+func hasTrackedFile(dir, name string) bool {
+	if !hasFile(dir, name) {
+		return false
+	}
+	return !isGitIgnored(dir, name)
+}
+
+func isGitIgnored(dir, filename string) bool {
+	cmd := exec.Command("git", "check-ignore", filename)
+	cmd.Dir = dir
+	if err := cmd.Run(); err == nil {
+		return true // File is ignored
+	}
+	return false
 }
 
 func hasDir(dir, name string) bool {
