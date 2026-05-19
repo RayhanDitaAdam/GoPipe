@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="./Logo.png" alt="GoPipe Logo" width="200"/>
+</div>
+
 # GoPipe
 
 GoPipe is a CLI tool to generate GitHub Actions CI/CD workflows automatically No more YAML headaches, let GoPipe handle it
